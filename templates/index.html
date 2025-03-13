@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taxonomy Enrichment Demo</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- jsTree styles and script -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/themes/default/style.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        nav {
+            background-color: #2c3e50;
+            padding: 10px;
+            text-align: center;
+        }
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+        }
+        nav ul li {
+            margin: 0 15px;
+        }
+        nav ul li a {
+            color: #ecf0f1;
+            text-decoration: none;
+            font-weight: bold;
+            padding: 8px 12px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        nav ul li a:hover {
+            background-color: #34495e;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+            background: white;
+            margin: 20px auto;
+            max-width: 800px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        .tab-content:first-child {
+            display: block;
+        }
+        h2 {
+            color: #2c3e50;
+        }
+        button {
+            background-color: #2980b9;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #1c5985;
+        }
+        pre {
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        #taxonomy-tree {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="#tab1" class="tab-link" data-tab="tab1">Taxonomy Merge</a></li>
+            <li><a href="#tab2" class="tab-link" data-tab="tab2">Upload & Analyze</a></li>
+            <li><a href="#tab3" class="tab-link" data-tab="tab3">Enrich Taxonomy</a></li>
+        </ul>
+    </nav>
+    
+    <div class="tab-content" id="tab1">
+        <h2>Taxonomy Merge</h2>
+        <p>Upload two taxonomies and we will provide a merged JSON file.</p>
+        <input type="file" id="upload-taxonomy1" accept="application/json">
+        <input type="file" id="upload-taxonomy2" accept="application/json">
+        <button onclick="mergeTaxonomies()">Merge</button>
+        <a id="download-link" style="display: none;" href="#" download="merged_taxonomy.json">
+            <button>Download Merged Taxonomy</button>
+        </a>
+        <pre id="merge-result"></pre>
+    </div>
+    
+    <div class="tab-content" id="tab2">
+        <h2>Upload & Analyze Taxonomy</h2>
+        <input type="file" id="upload-analysis" accept="application/json">
+        <button onclick="analyzeTaxonomy()">Analyze</button>
+        <pre id="analysis-result"></pre>
+
+        <!-- This is where the collapsible tree will appear -->
+        <div id="taxonomy-tree"></div>
+    </div>
+    
+    <div class="tab-content" id="tab3">
+        <h2>Enrich Taxonomy</h2>
+        <input type="file" id="upload-enrich" accept="application/json">
+        <button onclick="enrichTaxonomy()">Enrich</button>
+        <pre id="enrichment-result"></pre>
+    </div>
+    
+    <script>
+        // This handles switching between tabs and ensures the correct tab is highlighted
+        document.querySelectorAll('.tab-link').forEach(link => {
+            link.addEventListener('click', function(event) {
+                event.preventDefault();
+
+                // Remove active class from all tabs and add it to the clicked one
+                document.querySelectorAll('.tab-link').forEach(tab => tab.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Hide all tab contents
+                document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+                
+                // Show the selected tab content
+                document.getElementById(this.dataset.tab).style.display = 'block';
+            });
+        });
+
+        // Merge Taxonomies
+        function mergeTaxonomies() {
+            const fileInput1 = document.getElementById('upload-taxonomy1');
+            const fileInput2 = document.getElementById('upload-taxonomy2');
+            const file1 = fileInput1.files[0];
+            const file2 = fileInput2.files[0];
+
+            if (!file1 || !file2) {
+                alert('Please upload both JSON files.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('taxonomy1', file1);
+            formData.append('taxonomy2', file2);
+
+            fetch('/merge_taxonomies', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                // Create a URL for the blob and link it for downloading
+                const downloadLink = document.getElementById('download-link');
+                downloadLink.href = URL.createObjectURL(blob);
+                downloadLink.style.display = 'block';
+            })
+            .catch(error => {
+                document.getElementById('merge-result').textContent = 'Error: ' + error.message;
+            });
+        }
+
+        // Analyze Taxonomy
+        function analyzeTaxonomy() {
+            const fileInput = document.getElementById('upload-analysis');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please upload a JSON file.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/analyze_taxonomy', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('analysis-result').textContent = 'Error: ' + data.error;
+                } else {
+                    // Show the analysis result in the pre tag
+                    document.getElementById('analysis-result').textContent = JSON.stringify(data.analysis, null, 2);
+
+                    // Render the tree using jsTree
+                    renderTree(data.taxonomy);
+                }
+            })
+            .catch(error => {
+                document.getElementById('analysis-result').textContent = 'Error: ' + error.message;
+            });
+        }
+
+        // Convert to jsTree format
+        function convertToJsTreeFormat(node) {
+            return {
+                text: node.name,
+                children: node.children && node.children.length > 0
+                    ? node.children.map(child => convertToJsTreeFormat(child)) // Recursively convert children
+                    : [], // If no children, return empty array (makes the node non-expandable)
+                state: node.children && node.children.length > 0 ? {} : { "disabled": true } // Disable if no children
+            };
+        }
+
+        // Render the jsTree
+        function renderTree(taxonomy) {
+            const treeData = convertToJsTreeFormat(taxonomy);  // Get jsTree format data
+
+            // Destroy any previous tree before creating a new one
+            $('#taxonomy-tree').jstree("destroy").empty();
+
+            // Initialize the jsTree with correct data format
+            $('#taxonomy-tree').jstree({
+                'core': {
+                    'data': [treeData]  // Wrapping tree data in an array as jsTree expects an array of nodes
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>
